@@ -1,0 +1,46 @@
+---
+- hosts: 127.0.0.1
+  gather_facts: no
+  become: true
+  vars:
+   docker_user: ubuntu
+   docker_version: 1.12.6-0~ubuntu-xenial
+  tasks:
+   - name: Get kernel version and register var.
+     command: uname -r
+     register: kernel_version
+
+   - name: Update apt cache if needed.
+     apt: update_cache=yes
+
+   - name: Ensure that APT works with https method, and that CA certificates are installed.
+     apt: name={{ item }} state=present
+     with_items:
+      - apt-transport-https
+      - ca-certificates
+      - linux-image-extra-{{ kernel_version.stdout }}
+      - linux-image-extra-virtual
+
+   - name: Add new GPG key.
+     apt_key: 
+      keyserver: hkp://ha.pool.sks-keyservers.net:80
+      id: 58118E89F3A912897C070ADBF76221572C52609D
+      state: present
+
+   # correct to be indentepotence
+   - name: Deb
+     shell: >
+      echo "deb https://apt.dockerproject.org/repo ubuntu-xenial main" | sudo tee /etc/apt/sources.list.d/docker.list
+  
+   # notify?
+   - name: Update apt cache if needed.
+     apt: update_cache=yes 
+
+   - name: Install Docker engine.
+     command: apt-get install docker-engine={{ docker_version }} -y 
+
+   - name: Start docker service and make it run on system boot.
+     service: name=docker state=started enabled=yes
+
+   - name: Adding user to docker group.
+     command: usermod -aG docker {{ docker_user }}
